@@ -25,6 +25,8 @@
 ---@field xcode boolean
 ---@field xcode_chat boolean
 
+vim.notify("Copilot: Starting authentication", vim.log.levels.INFO)
+
 local curl = require("plenary.curl")
 
 local Path = require("plenary.path")
@@ -103,6 +105,7 @@ function H.get_enterprise_url() return os.getenv("GITHUB_ENTERPRISE_URL") end
 ---
 ---@return string
 function H.get_oauth_token()
+  vim.notify("Copilot: attempting to get token", vim.log.levels.INFO)
   local xdg_config = vim.fn.expand("$XDG_CONFIG_HOME")
   local os_name = Utils.get_os_name()
   ---@type string
@@ -127,6 +130,7 @@ function H.get_oauth_token()
 
   local yason = paths[1]
   local enterprise_url = H.get_enterprise_url()
+  vim.notify("Copilot: enterprise_url " .. tostring(enterprise_url ~= nil), vim.log.levels.INFO)
   local target_host = enterprise_url and enterprise_url:gsub("^https?://", "") or "github.com"
   return vim
     .iter(
