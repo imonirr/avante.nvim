@@ -93,6 +93,10 @@ local function start_manager_check_timer()
   )
 end
 
+---Get enterprise URL from environment
+---@return string|nil
+function H.get_enterprise_url() return os.getenv("GITHUB_ENTERPRISE_URL") end
+
 ---@class OAuthToken
 ---@field user string
 ---@field oauth_token string
@@ -122,13 +126,15 @@ function H.get_oauth_token()
   if #paths == 0 then error("You must setup copilot with either copilot.lua or copilot.vim", 2) end
 
   local yason = paths[1]
+  local enterprise_url = H.get_enterprise_url()
+  local target_host = enterprise_url and enterprise_url:gsub("^https?://", "") or "github.com"
   return vim
     .iter(
       ---@type table<string, OAuthToken>
       ---@diagnostic disable-next-line: param-type-mismatch
       vim.json.decode(yason:read())
     )
-    :filter(function(k, _) return k:match("github.com") end)
+    :filter(function(k, _) return k:find(target_host, 1, true) ~= nil end)
     ---@param acc {oauth_token: string}
     :fold({}, function(acc, _, v)
       acc.oauth_token = v.oauth_token
@@ -137,7 +143,14 @@ function H.get_oauth_token()
     .oauth_token
 end
 
-H.chat_auth_url = "https://api.github.com/copilot_internal/v2/token"
+---Get the chat auth URL (enterprise or public)
+---@return string
+function H.get_chat_auth_url()
+  local enterprise_url = H.get_enterprise_url()
+  if enterprise_url then return enterprise_url .. "/api/v3/copilot_internal/v2/token" end
+  return "https://api.github.com/copilot_internal/v2/token"
+end
+
 function H.chat_completion_url(base_url) return Utils.url_join(base_url, "/chat/completions") end
 function H.response_url(base_url) return Utils.url_join(base_url, "/responses") end
 
@@ -186,15 +199,17 @@ function H.refresh_token(async, force)
     end
   end
 
+  local auth_url = H.get_chat_auth_url()
+
   if async then
     curl.get(
-      H.chat_auth_url,
+      auth_url,
       vim.tbl_deep_extend("force", {
         callback = handle_response,
       }, curl_opts)
     )
   else
-    local response = curl.get(H.chat_auth_url, curl_opts)
+    local response = curl.get(auth_url, curl_opts)
     handle_response(response)
   end
 end
